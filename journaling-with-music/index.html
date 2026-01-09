@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Espresso Thoughts | Music Journal</title>
+    <style>
+        :root {
+            --espresso: #3E2723;
+            --latte: #A1887F;
+            --cream: #FFF8E1;
+            --paper: #ffffff;
+            --accent: #D7CCC8;
+            --bg-dot: #D7CCC8;
+        }
+
+        body {
+            background-color: var(--cream);
+            background-image: radial-gradient(var(--bg-dot) 0.5px, transparent 0.5px);
+            background-size: 20px 20px;
+            font-family: 'Georgia', serif;
+            color: var(--espresso);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .screen {
+            background: var(--paper);
+            border: 2px solid var(--espresso);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 8px 8px 0px var(--latte);
+            display: none;
+            animation: fadeIn 0.4s;
+        }
+
+        .screen.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 { text-align: center; font-size: 1.8rem; margin-bottom: 25px; }
+        
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; }
+        
+        textarea, input {
+            width: 100%;
+            background-color: var(--cream);
+            border: 1px solid var(--latte);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 15px;
+            font-family: inherit;
+            box-sizing: border-box;
+            color: var(--espresso);
+        }
+
+        textarea { height: 120px; resize: none; }
+
+        button {
+            width: 100%;
+            background-color: var(--espresso);
+            color: var(--cream);
+            border: none;
+            padding: 15px;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-bottom: 10px;
+        }
+
+        button:hover { background-color: var(--latte); transform: scale(1.02); }
+        .btn-secondary { background-color: transparent; color: var(--espresso); border: 1px solid var(--espresso); }
+
+        /* Search Results Styling */
+        #searchResults {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            border-radius: 12px;
+            background: rgba(161, 136, 127, 0.1);
+        }
+
+        .track-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--accent);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: background 0.2s;
+        }
+
+        .track-item:hover { background: var(--accent); }
+        .track-item img { border-radius: 6px; width: 40px; height: 40px; }
+
+        /* Entry Cards in History */
+        .entry-card {
+            background: var(--cream);
+            border: 1px solid var(--latte);
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .entry-card:hover { border-color: var(--espresso); transform: rotate(-1deg); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="screenMain" class="screen active">
+        <h1>☕ Espresso Thoughts</h1>
+        <button onclick="showScreen('screenCreate')">New Journal Note</button>
+        <button class="btn-secondary" onclick="renderHistory()">Past Memories</button>
+    </div>
+
+    <div id="screenCreate" class="screen">
+        <h1>Write & Listen</h1>
+        
+        <label>Date</label>
+        <input type="date" id="inputDate">
+        
+        <label>Your Thought</label>
+        <textarea id="inputText" placeholder="What's on your mind?"></textarea>
+        
+        <label>Pick a Soundtrack</label>
+        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <input type="text" id="musicSearchQuery" placeholder="Search song..." style="margin-bottom: 0;">
+            <button type="button" onclick="searchMusic()" style="width: 80px; margin-top: 0; padding: 0 10px;">Find</button>
+        </div>
+        
+        <div id="searchResults"></div>
+        <input type="hidden" id="inputMusic"> <div id="liveMusicPreview"></div>
+        
+        <button onclick="saveEntry()" style="margin-top: 10px;">Save Memory</button>
+        <button class="btn-secondary" onclick="showScreen('screenMain')">Back</button>
+    </div>
+
+    <div id="screenView" class="screen">
+        <h2 id="viewDateDisplay" style="margin-bottom: 10px;"></h2>
+        <p id="viewTextDisplay" style="white-space: pre-wrap; line-height: 1.6; margin-bottom: 20px;"></p>
+        
+        <div id="viewMusicDisplay"></div> <hr style="border: 0; border-top: 1px solid var(--accent); margin: 25px 0;">
+        <button id="deleteBtn">Delete This Entry</button>
+        <button class="btn-secondary" onclick="showScreen('screenMain')">Go Home</button>
+    </div>
+
+    <div id="screenHistory" class="screen">
+        <h1>Your History</h1>
+        <div id="historyList"></div>
+        <button class="btn-secondary" onclick="showScreen('screenMain')" style="margin-top: 20px;">Back to Menu</button>
+    </div>
+</div>
+
+<script>
+    // Data Management
+    let entries = JSON.parse(localStorage.getItem('coffee_journal_data')) || [];
+
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    // --- Search Music via iTunes API ---
+    async function searchMusic() {
+        const query = document.getElementById('musicSearchQuery').value;
+        const resultsDiv = document.getElementById('searchResults');
+        if (!query) return;
+
+        resultsDiv.innerHTML = "<p style='padding:10px; font-size:0.8rem;'>Brewing results...</p>";
+
+        try {
+            const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=5`);
+            const data = await response.json();
+            resultsDiv.innerHTML = "";
+
+            data.results.forEach(track => {
+                const div = document.createElement('div');
+                div.className = 'track-item';
+                div.innerHTML = `
+                    <img src="${track.artworkUrl60}">
+                    <div>
+                        <div style="font-weight:bold;">${track.trackName}</div>
+                        <div style="font-size:0.7rem;">${track.artistName}</div>
+                    </div>
+                `;
+                div.onclick = () => {
+                    document.getElementById('inputMusic').value = track.trackViewUrl;
+                    document.getElementById('musicSearchQuery').value = `${track.trackName} - ${track.artistName}`;
+                    updateLivePreview();
+                    resultsDiv.innerHTML = "";
+                };
+                resultsDiv.appendChild(div);
+            });
+        } catch (e) {
+            resultsDiv.innerHTML = "<p style='padding:10px;'>Error finding music.</p>";
+        }
+    }
+
+    // --- Original Logic for Embed Link ---
+    function updateLivePreview() {
+        const url = document.getElementById('inputMusic').value;
+        const previewDiv = document.getElementById('liveMusicPreview');
+        
+        if (url && url.includes("music.apple.com")) {
+            // Converts link to embed
+            let embedUrl = url.replace("music.apple.com", "embed.music.apple.com");
+            previewDiv.innerHTML = `
+                <div style="border-radius: 12px; overflow: hidden; margin-top: 10px;">
+                    <iframe allow="autoplay *; encrypted-media *; fullscreen *" frameborder="0" height="150" style="width:100%;" src="${embedUrl}"></iframe>
+                </div>`;
+        }
+    }
+
+    function saveEntry() {
+        const date = document.getElementById('inputDate').value;
+        const text = document.getElementById('inputText').value;
+        const musicUrl = document.getElementById('inputMusic').value;
+
+        if (!date || !text) return alert("Write down your thoughts first!");
+
+        const newEntry = {
+            id: Date.now(),
+            date: date,
+            text: text,
+            musicUrl: musicUrl,
+            hasMusic: musicUrl.length > 0 //
+        };
+
+        entries.unshift(newEntry);
+        localStorage.setItem('coffee_journal_data', JSON.stringify(entries));
+        
+        // Reset form
+        document.getElementById('inputText').value = "";
+        document.getElementById('inputMusic').value = "";
+        document.getElementById('liveMusicPreview').innerHTML = "";
+        document.getElementById('musicSearchQuery').value = "";
+        
+        showScreen('screenMain');
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('historyList');
+        list.innerHTML = entries.length === 0 ? "<p style='text-align:center;'>Your journal is empty.</p>" : "";
+        
+        entries.forEach(entry => {
+            const div = document.createElement('div');
+            div.className = 'entry-card';
+            div.innerHTML = `<strong>${new Date(entry.date).toDateString()}</strong><br><small>${entry.text.substring(0, 60)}...</small>`;
+            div.onclick = () => viewEntry(entry.id);
+            list.appendChild(div);
+        });
+        showScreen('screenHistory');
+    }
+
+    // --- Your Provided Logic ---
+    function viewEntry(id) {
+        const entry = entries.find(e => e.id === id); //
+        document.getElementById('viewDateDisplay').innerText = new Date(entry.date).toDateString(); //
+        document.getElementById('viewTextDisplay').innerText = entry.text; //
+        
+        const musicDiv = document.getElementById('viewMusicDisplay'); //
+        
+        if(entry.hasMusic && entry.musicUrl) { //
+            // Converts standard link to embed link
+            let embedUrl = entry.musicUrl.replace("music.apple.com", "embed.music.apple.com");
+            
+            musicDiv.innerHTML = `
+                <div style="margin-top: 20px; border-radius: 12px; overflow: hidden;">
+                    <iframe 
+                        allow="autoplay *; encrypted-media *; fullscreen *; clipboard-write" 
+                        frameborder="0" 
+                        height="175" 
+                        style="width:100%; max-width:660px; overflow:hidden; background:transparent;" 
+                        sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" 
+                        src="${embedUrl}">
+                    </iframe>
+                </div>`; //
+        } else {
+            musicDiv.innerHTML = ''; //
+        }
+
+        document.getElementById('deleteBtn').onclick = () => deleteEntry(id); //
+        showScreen('screenView'); //
+    }
+
+    function deleteEntry(id) {
+        if(confirm("Discard this coffee thought?")) {
+            entries = entries.filter(e => e.id !== id);
+            localStorage.setItem('coffee_journal_data', JSON.stringify(entries));
+            renderHistory();
+        }
+    }
+
+    // Auto-set today's date
+    document.getElementById('inputDate').valueAsDate = new Date();
+</script>
+
+</body>
+</html>
