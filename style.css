@@ -51,4 +51,10 @@ textarea, input {
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 15px;
+
 }
+#viewTextdisplay {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
